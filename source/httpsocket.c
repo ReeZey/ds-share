@@ -7,14 +7,40 @@
 #include <stdio.h>
 #include <string.h>
 
-void getHttp(char *url) {
+u16 *videoMemoryMain;
+// u16 *videoMemorySub;
 
+//https://stackoverflow.com/questions/55178026/reading-more-than-one-message-from-recv
+int recv_all(int socket, u16 *buffer_ptr, size_t bytes_to_recv)
+{
+    size_t original_bytes_to_recv = bytes_to_recv;
+    iprintf("1.");
+    while (bytes_to_recv > 0)
+    {
+        iprintf("%d\n", bytes_to_recv);
+        int ret = recv(socket, buffer_ptr, bytes_to_recv, 0);
+        if (ret <= 0)
+        {
+            return ret;
+        }
+
+        bytes_to_recv -= ret;
+        buffer_ptr += ret;
+    }
+
+    iprintf("2.");
+    return original_bytes_to_recv;
+}
+
+void getHttp(char *url)
+{
     struct hostent *myhost = gethostbyname(url);
 
     iprintf("Creating socket... ");
 
     int my_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (my_socket == -1) {
+    if (my_socket == -1)
+    {
         iprintf("Failed!\n");
         return;
     }
@@ -27,29 +53,23 @@ void getHttp(char *url) {
     sain.sin_port = htons(1337);
     sain.sin_addr.s_addr = *((unsigned long *)(myhost->h_addr_list[0]));
 
+    swiWaitForVBlank();
     iprintf("Connecting to socket... ");
 
     int connection = connect(my_socket, (struct sockaddr *)&sain, sizeof(sain));
-    if (connection == -1) {
+    if (connection == -1)
+    {
         iprintf("Failed!\n");
         return;
     }
 
     iprintf("Success!\n");
 
-    int success = 1;
-
-    while (success != -1) {
-        swiWaitForVBlank();
-        scanKeys();
-
-        int pressed = keysDown();
-
-        char text[sizeof(pressed)];
-        sprintf(text, "%d", pressed);
-
-        success = send(my_socket, text, strlen(text), 0);
-    }
+    u16 recvBuff[192*256];
+    int len = sizeof(recvBuff);
+    
+    recv_all(my_socket, recvBuff, len);
+    memcpy(videoMemoryMain, recvBuff, len);
 
     iprintf("oh no he disconnected!\n");
 
@@ -57,63 +77,40 @@ void getHttp(char *url) {
     closesocket(my_socket);
 }
 
-int main(void) {
+int main(void)
+{
+    int test = ARGB16(1,255,255,255);
+    printf("colur: %d", test);
 
-    int x, y;
+    consoleDemoInit();
 
-    // set the mode to allow for an extended rotation background
     videoSetMode(MODE_5_2D);
-    videoSetModeSub(MODE_5_2D);
+    // videoSetModeSub(MODE_5_2D);
 
-    // allocate a vram bank for each display
     vramSetBankA(VRAM_A_MAIN_BG);
-    vramSetBankC(VRAM_C_SUB_BG);
+    // vramSetBankC(VRAM_C_SUB_BG);
 
-    // create a background on each display
     int bgMain = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
-    int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    // int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
 
-    u16 *videoMemoryMain = bgGetGfxPtr(bgMain);
-    u16 *videoMemorySub = bgGetGfxPtr(bgSub);
+    videoMemoryMain = bgGetGfxPtr(bgMain);
+    // videoMemorySub = bgGetGfxPtr(bgSub);
 
-    while (1) {
-        swiWaitForVBlank();
+    iprintf("Contacting Wi-Fi... ");
 
-        for (y = 0; y < 192; y++) {
-            for (x = 0; x < 256; x++) {
-                videoMemoryMain[x + y * 256] = ARGB16(1, rand() % 255, rand() % 255, rand() % 255);
-                videoMemorySub[x + y * 256] = ARGB16(1, rand() % 255, rand() % 255, rand() % 255);
-            }
-        }
+    if (!Wifi_InitDefault(WFC_CONNECT))
+    {
+        iprintf("Failed!\n");
+    }
+    else
+    {
+        iprintf("Connected\n\n");
+        getHttp("10.0.0.76");
     }
 
-  /*
-
-      if(!Wifi_InitDefault(WFC_CONNECT)) {
-              iprintf("Failed to connect!\n");
-      } else {
-
-              iprintf("Connected\n\n");
-
-              getHttp("10.0.0.76");
-      }
-
-  iprintf("uhh something\n");
-
-      while(1) {
-              swiWaitForVBlank();
-      int keys = keysDown();
-      if(keys & KEY_START) break;
-      }
-
-  iprintf("return\n");
-
-  while(1) {
-              swiWaitForVBlank();
-      int keys = keysDown();
-      if(keys & KEY_SELECT) break;
-      }
-  */
-
+    while(1){
+        swiWaitForVBlank();
+    }
+    
     return 0;
 }
