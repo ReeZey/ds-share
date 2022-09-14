@@ -6,7 +6,7 @@ var Jimp = require('jimp');
 
 var imageBuffer = new Uint16Array(256*192);
 
-Jimp.read('image2.png', (err, img) => {
+Jimp.read('image.png', (err, img) => {
     if (err) throw err;
     //#define ARGB16(a,r,g,b) ( ((a) << 15) | (r)|((g)<<5)|((b)<<10))
 
@@ -29,12 +29,13 @@ server.listen(port, () => {
 server.on('connection', (socket) => {
     console.log('A new connection has been established.');
 	
-    var data_8 = new Uint8Array(imageBuffer.buffer, imageBuffer.byteOffset, imageBuffer.byteLength)
-    
+    var data_8 = new Uint8Array(imageBuffer.buffer, imageBuffer.byteOffset, imageBuffer.byteLength);
+    //var segmented = chunk(data_8, 536);
 
-    socket.write(data_8);
     
-    console.log(socket);
+    socket.write(data_8);
+
+    //writeOneMillionTimes(socket, segmented);
 
     socket.on('data', (chunk) => {
         console.log(chunk);
@@ -45,6 +46,38 @@ server.on('connection', (socket) => {
     });
 	
     socket.on('error', (err) => {
-        console.log(`Error: ${err}`);
+        console.log(err);
     });
 });
+/*
+const timer = ms => new Promise(res => setTimeout(res, ms))
+
+function writeOneMillionTimes(socket, data) {
+    var i = 0;
+
+    let write = async () => {
+        var ok = true;
+
+        while(ok && i < data.length){
+            ok = socket.write(data[i]);
+
+            //await timer(10);
+
+            i += 1;
+        };
+
+        //writer.once('drain', () => setTimeout(write, 100));
+        socket.once('drain', () => write);
+    }
+
+    write();
+  }
+
+function chunk(s, maxBytes) {
+    const result = [];
+    for (var i = 0; i < s.length; i += maxBytes){
+        result.push(s.slice(i, i + maxBytes));
+    }
+    return result;
+}
+*/
