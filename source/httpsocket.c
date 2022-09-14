@@ -7,29 +7,28 @@
 #include <stdio.h>
 #include <string.h>
 
-u16 *videoMemoryMain;
-// u16 *videoMemorySub;
+int bgMain;
 
 //https://stackoverflow.com/questions/55178026/reading-more-than-one-message-from-recv
-int recv_all(int socket, u16 *buffer_ptr, size_t bytes_to_recv)
+int recv_all(int socket)
 {
-    size_t original_bytes_to_recv = bytes_to_recv;
-    iprintf("1.");
-    while (bytes_to_recv > 0)
+    int aa =  192*256*2;
+    u16* ptr = bgGetGfxPtr(bgMain);
+
+    while (aa > 0)
     {
-        iprintf("%d\n", bytes_to_recv);
-        int ret = recv(socket, buffer_ptr, bytes_to_recv, 0);
+        int ret = recv(socket, ptr, aa, 0);
         if (ret <= 0)
         {
-            return ret;
+            return -1;
         }
 
-        bytes_to_recv -= ret;
-        buffer_ptr += ret;
-    }
+        aa -= ret;
+        ptr += ret;
 
-    iprintf("2.");
-    return original_bytes_to_recv;
+        iprintf("diff: %d\n", ret);
+    }
+    return 0;
 }
 
 void getHttp(char *url)
@@ -65,13 +64,14 @@ void getHttp(char *url)
 
     iprintf("Success!\n");
 
-    u16 recvBuff[192*256];
-    int len = sizeof(recvBuff);
-    
-    recv_all(my_socket, recvBuff, len);
-    memcpy(videoMemoryMain, recvBuff, len);
+    int iResult = recv_all(my_socket);
 
-    iprintf("oh no he disconnected!\n");
+    if(iResult == -1){
+        iprintf("oh no he disconnected!\n");
+        return;
+    }
+
+    iprintf("WE DID IT REDDIT!\n");
 
     shutdown(my_socket, 0);
     closesocket(my_socket);
@@ -79,9 +79,6 @@ void getHttp(char *url)
 
 int main(void)
 {
-    int test = ARGB16(1,255,255,255);
-    printf("colur: %d", test);
-
     consoleDemoInit();
 
     videoSetMode(MODE_5_2D);
@@ -90,12 +87,12 @@ int main(void)
     vramSetBankA(VRAM_A_MAIN_BG);
     // vramSetBankC(VRAM_C_SUB_BG);
 
-    int bgMain = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    bgMain = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     // int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
 
-    videoMemoryMain = bgGetGfxPtr(bgMain);
+    //videoMemoryMain = bgGetGfxPtr(bgMain);
     // videoMemorySub = bgGetGfxPtr(bgSub);
-
+        
     iprintf("Contacting Wi-Fi... ");
 
     if (!Wifi_InitDefault(WFC_CONNECT))
@@ -105,7 +102,7 @@ int main(void)
     else
     {
         iprintf("Connected\n\n");
-        getHttp("10.0.0.76");
+        getHttp("10.0.0.2");
     }
 
     while(1){
