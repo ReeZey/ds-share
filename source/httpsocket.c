@@ -7,27 +7,29 @@
 #include <stdio.h>
 #include <string.h>
 
+char recvBuff[192*256*2];
 int bgMain;
 
 //https://stackoverflow.com/questions/55178026/reading-more-than-one-message-from-recv
 int recv_all(int socket)
 {
-    int aa =  192*256*2;
-    u16* ptr = bgGetGfxPtr(bgMain);
+    char* pointer = recvBuff;
+    int size = sizeof(recvBuff);
 
-    while (aa > 0)
+    while (size > 0)
     {
-        int ret = recv(socket, ptr, aa, 0);
+        int ret = recv(socket, pointer, sizeof(recvBuff), 0);
         if (ret <= 0)
         {
             return -1;
         }
 
-        aa -= ret;
-        ptr += ret;
+        //send(socket, pointer, ret, 0);
 
-        iprintf("diff: %d\n", ret);
+        size -= ret;
+        pointer += ret;
     }
+
     return 0;
 }
 
@@ -64,14 +66,20 @@ void getHttp(char *url)
 
     iprintf("Success!\n");
 
-    int iResult = recv_all(my_socket);
+    int wang = 1;
+    u16* videobuffer = bgGetGfxPtr(bgMain);
 
-    if(iResult == -1){
-        iprintf("oh no he disconnected!\n");
-        return;
+    while(true){
+        send(my_socket, &wang, 1, 0);
+        int iResult = recv_all(my_socket);
+        
+        if(iResult == -1){
+            iprintf("oh no he disconnected!\n");
+            break;
+        }
+
+        memcpy(videobuffer, recvBuff, sizeof(recvBuff));
     }
-
-    iprintf("WE DID IT REDDIT!\n");
 
     shutdown(my_socket, 0);
     closesocket(my_socket);
@@ -90,7 +98,7 @@ int main(void)
     bgMain = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     // int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
 
-    //videoMemoryMain = bgGetGfxPtr(bgMain);
+    // videoMemoryMain = bgGetGfxPtr(bgMain);
     // videoMemorySub = bgGetGfxPtr(bgSub);
         
     iprintf("Contacting Wi-Fi... ");
@@ -98,12 +106,11 @@ int main(void)
     if (!Wifi_InitDefault(WFC_CONNECT))
     {
         iprintf("Failed!\n");
+        return 0;
     }
-    else
-    {
-        iprintf("Connected\n\n");
-        getHttp("10.0.0.2");
-    }
+
+    iprintf("Connected\n\n");
+    getHttp("10.0.0.2");
 
     while(1){
         swiWaitForVBlank();
