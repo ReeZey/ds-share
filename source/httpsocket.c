@@ -10,6 +10,31 @@
 char recvBuff[192*256*2];
 int bgMain;
 
+static inline void newmemcpy(void *__restrict__ dstp, void *__restrict__ srcp, uint len)
+{
+    ulong *dst = (ulong *) dstp;
+    ulong *src = (ulong *) srcp;
+    uint i, tail;
+
+    for(i = 0; i < (len / sizeof(ulong)); i++)
+        *dst++ = *src++;
+    /*
+        Remove below if your application does not need it.
+        If console application, you can uncomment the printf to test
+        whether tail processing is being used.
+    */
+    tail = len & (sizeof(ulong) - 1);
+    if(tail) {
+        //printf("tailused\n");
+        u_char *dstb = (u_char *) dstp;
+        u_char *srcb = (u_char *) srcp;
+
+        for(i = len - tail; i < len; i++)
+            dstb[i] = srcb[i];
+    }
+}
+
+
 //https://stackoverflow.com/questions/55178026/reading-more-than-one-message-from-recv
 int recv_all(int socket)
 {
@@ -78,7 +103,7 @@ void getHttp(char *url)
             break;
         }
 
-        memcpy(videobuffer, recvBuff, sizeof(recvBuff));
+        newmemcpy(videobuffer, recvBuff, sizeof(recvBuff));
     }
 
     shutdown(my_socket, 0);
@@ -110,10 +135,15 @@ int main(void)
     }
 
     iprintf("Connected\n\n");
-    getHttp("10.0.0.2");
 
     while(1){
         swiWaitForVBlank();
+        scanKeys();
+        int keys = keysDown();
+
+        if(keys & KEY_START){
+            getHttp("10.0.0.2");
+        }
     }
     
     return 0;
