@@ -7,52 +7,27 @@
 #include <stdio.h>
 #include <string.h>
 
-char recvBuff[192*256*2];
-int bgMain;
-
-static inline void newmemcpy(void *__restrict__ dstp, void *__restrict__ srcp, uint len)
-{
-    ulong *dst = (ulong *) dstp;
-    ulong *src = (ulong *) srcp;
-    uint i, tail;
-
-    for(i = 0; i < (len / sizeof(ulong)); i++)
-        *dst++ = *src++;
-    /*
-        Remove below if your application does not need it.
-        If console application, you can uncomment the printf to test
-        whether tail processing is being used.
-    */
-    tail = len & (sizeof(ulong) - 1);
-    if(tail) {
-        //printf("tailused\n");
-        u_char *dstb = (u_char *) dstp;
-        u_char *srcb = (u_char *) srcp;
-
-        for(i = len - tail; i < len; i++)
-            dstb[i] = srcb[i];
-    }
-}
-
+char recvBuff[256*192*4];
+int fullSize;
 
 //https://stackoverflow.com/questions/55178026/reading-more-than-one-message-from-recv
 int recv_all(int socket)
 {
-    char* pointer = recvBuff;
-    int size = sizeof(recvBuff);
+    recv(socket, &fullSize, sizeof(int), 0);
 
-    while (size > 0)
+    char* pointr = recvBuff;
+    int count = fullSize;
+
+    while (count > 0)
     {
-        int ret = recv(socket, pointer, sizeof(recvBuff), 0);
+        int ret = recv(socket, pointr, fullSize, 0);
         if (ret <= 0)
         {
             return -1;
         }
 
-        //send(socket, pointer, ret, 0);
-
-        size -= ret;
-        pointer += ret;
+        count -= ret;
+        pointr += ret;
     }
 
     return 0;
@@ -91,11 +66,10 @@ void getHttp(char *url)
 
     iprintf("Success!\n");
 
-    int wang = 1;
-    u16* videobuffer = bgGetGfxPtr(bgMain);
+    //int wang = 1;
 
     while(true){
-        send(my_socket, &wang, 1, 0);
+        //send(my_socket, &wang, 1, 0);
         int iResult = recv_all(my_socket);
         
         if(iResult == -1){
@@ -103,7 +77,26 @@ void getHttp(char *url)
             break;
         }
 
-        newmemcpy(videobuffer, recvBuff, sizeof(recvBuff));
+        //printf("parse\n");
+        int index = 0;
+        int offset = 0;
+
+        while(index < fullSize){
+            u16 type = (uint16_t)(((recvBuff[1 + index] & 0xFF) << 8) | recvBuff[0 + index]);
+            u16 len  = (uint16_t)(((recvBuff[3 + index] & 0xFF) << 8) | recvBuff[2 + index]);
+
+            //printf("type %d ", type);
+            //printf("len %d\n", len);
+
+            if(type == 1){
+                memcpy(VRAM_A + offset, &recvBuff[index + 4], len * 2);
+                index += len * 2;
+            }
+
+            offset += len;
+            index += 4;
+        }
+        //memcpy(VRAM_A, recvBuff, sizeof(recvBuff));
     }
 
     shutdown(my_socket, 0);
@@ -114,18 +107,9 @@ int main(void)
 {
     consoleDemoInit();
 
-    videoSetMode(MODE_5_2D);
-    // videoSetModeSub(MODE_5_2D);
+    videoSetMode(MODE_FB0);
+    vramSetBankA(VRAM_A_LCD);
 
-    vramSetBankA(VRAM_A_MAIN_BG);
-    // vramSetBankC(VRAM_C_SUB_BG);
-
-    bgMain = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
-    // int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
-
-    // videoMemoryMain = bgGetGfxPtr(bgMain);
-    // videoMemorySub = bgGetGfxPtr(bgSub);
-        
     iprintf("Contacting Wi-Fi... ");
 
     if (!Wifi_InitDefault(WFC_CONNECT))
@@ -142,7 +126,7 @@ int main(void)
         int keys = keysDown();
 
         if(keys & KEY_START){
-            getHttp("10.0.0.2");
+            getHttp("10.0.0.76");
         }
     }
     
