@@ -2,6 +2,7 @@ import robot from "robotjs";
 import sharp from "sharp";
 import Net from 'net';
 import { deflate, constants } from 'node:zlib';
+import * as fs from 'fs';
 
 const server = new Net.Server();
 const port = 1337;
@@ -12,15 +13,10 @@ server.listen(port, () => {
 
 server.on('connection', (socket) => {
     console.log('A new connection has been established.');
-    /*
+
     socket.on('data', async (chunk) => {
         console.log(new Date(), chunk);
-
-        if(chunk[0] == 1){
-            SendScreenshot(socket);
-        }
     });
-    */
 
     SendScreenshot(socket);
 });
@@ -29,64 +25,72 @@ var lastSend = new Uint16Array(256 * 192);
 var output2 = new Uint8Array(256 * 192 * 3);
 
 async function SendScreenshot(socket) {
-
-    console.log("--- new img ---")
-
-    console.time("total");
-
-    console.time("screenshot");
     const im = robot.screen.capture(0, 0, 1920, 1080);
     const rescaled = await sharp(im.image, { raw: { width: im.width, height: im.height, channels: im.bytesPerPixel } }).resize(256, 192, { fit: "fill" }).raw().toBuffer();
-    console.timeEnd("screenshot");
 
-    console.time("color");
     var imageBuffer = new Uint16Array(256 * 192);
     for (var i = 0; i < rescaled.length; i += 4) {
         imageBuffer[i >> 2] = (((rescaled[i + 3] ? 1 : 0) << 15) | (rescaled[i + 2] >> 3) | ((rescaled[i + 1] >> 3) << 5) | ((rescaled[i] >> 3) << 10));
     }
-    console.timeEnd("color");
-    
-    
-    console.time("diff check");
-    var current = [];
-    var output = [];
+
+    var current = new Uint16Array(256 * 192 * 4);
+    var output = new Uint16Array(256 * 192 * 4);
+
+    var currentIndex = 0;
+    var outputIndex = 0;
+
     var skip = 0;
 
     for (var i = 0; i < imageBuffer.length; i++) {
-        if (imageBuffer[i] != lastSend[i]) {
+        if (imageBuffer[i] ^ lastSend[i]) {
             if (skip > 0) {
-                output.push(0);
-                output.push(skip);
+                output[outputIndex] = 0;
+                output[outputIndex+1] = skip;
+
+                outputIndex += 2;
 
                 skip = 0;
             }
 
-            current.push(imageBuffer[i]);
+            current[currentIndex] = imageBuffer[i];
+            currentIndex++;
         } else {
-            if (current.length > 0) {
-                output.push(1);
-                output.push(current.length);
-                output = output.concat(current);
+            if (currentIndex > 0) {
+                output[outputIndex] = 1;
+                output[outputIndex + 1] = currentIndex;
+
+                outputIndex += 2;
+
+                for(var j = 0; j < currentIndex; j++){
+                    output[outputIndex + j] = current[j]; 
+                }
+
+                outputIndex += currentIndex;
                 
-                current = [];
+                currentIndex = 0;
             }
 
             skip++;
         }
     }
 
-    if (current.length > 0) {
-        output.push(1);
-        output.push(current.length);
-        output = output.concat(current);
+    if (currentIndex > 0) {
+        output[outputIndex] = 1;
+        output[outputIndex + 1] = currentIndex;
+
+        outputIndex += 2;
+
+        for(var j = 0; j < currentIndex; j++){
+            output[outputIndex + j] = current[j]; 
+        }
+        
+        outputIndex += currentIndex;
     }
 
-    console.timeEnd("diff check");
+    var data_8 = new Uint8Array(output.buffer, output.byteOffset, outputIndex * 2);
 
-    var data_16 = Uint16Array.from(output);
-    var data_8 = new Uint8Array(data_16.buffer);
-
-    console.log("bytes to send:", data_8.length);
+    //console.log(output);
+    //console.log(data_8);
 
     /*
     deflate(data_8, (err, buffer) => {
@@ -94,13 +98,32 @@ async function SendScreenshot(socket) {
     }, {options: constants.Z_NO_COMPRESSION});
     */
 
-    lastSend = imageBuffer;
-
     //send
 
+    if(socket != null){
+        var fullsize = data_8.length;
 
+        if(fullsize != 0){
+            var buff = Buffer.alloc(4);
+            buff.writeUint32LE(fullsize);
     
+            socket.write(Buffer.concat([buff, data_8]), () => {
+                lastSend = imageBuffer;
+                SendScreenshot(socket);
+            });
+            //socket.write(buff);
+            //socket.write(data_8);
+            
+            console.log({fullsize});
+            return;
+        }
 
+        setTimeout(() => {
+            SendScreenshot(socket);
+        }, 5000)
+    }
+
+    /*
     var recv_16 = new Uint16Array(data_8.buffer);
     
     let fullSize = recv_16.length;
@@ -162,28 +185,13 @@ async function SendScreenshot(socket) {
 
     console.timeEnd("total");
 
-    SendScreenshot(socket);
-
     //console.log("done");
 
     //console.log(data_16);
     //console.log(data_8);
 
-    /*
-    var buff = Buffer.alloc(4);
-    buff.writeUint32LE(data_8.length);
-
-    socket.write(buff);
-    socket.write(data_8, () => {
-        console.log("sent");
-        lastSend = imageBuffer;
-
-        setTimeout(() => {
-            SendScreenshot(socket);
-        }, 20);
-    });
     */
-
+    //SendScreenshot(null);
 
     /*
     deflate(data_8, (err, buffer) => {
@@ -192,4 +200,4 @@ async function SendScreenshot(socket) {
     */
 }
 
-SendScreenshot(null);
+//SendScreenshot(null);

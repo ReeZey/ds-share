@@ -84,7 +84,7 @@ void getHttp(char *url)
         while(index < fullSize){
             u16 type = (uint16_t)(((recvBuff[1 + index] & 0xFF) << 8) | recvBuff[0 + index]);
             u16 len  = (uint16_t)(((recvBuff[3 + index] & 0xFF) << 8) | recvBuff[2 + index]);
-
+            
             //printf("type %d ", type);
             //printf("len %d\n", len);
 
