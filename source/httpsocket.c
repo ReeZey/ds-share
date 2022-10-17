@@ -10,6 +10,8 @@
 char recvBuff[256*192*4];
 int fullSize;
 
+u16 tempScreen[256*192];
+
 //https://stackoverflow.com/questions/55178026/reading-more-than-one-message-from-recv
 int recv_all(int socket)
 {
@@ -33,6 +35,7 @@ int recv_all(int socket)
         count -= ret;
         pointr += ret;
     }
+
     return 0;
 }
 
@@ -69,10 +72,10 @@ void getHttp(char *url)
 
     iprintf("Success!\n");
 
-    //int wang = 1;
+    int wang = 0;
 
     while(true){
-        //send(my_socket, &wang, 1, 0);
+        send(my_socket, &wang, 1, 0);
         int iResult = recv_all(my_socket);
         
         if(iResult == -1){
@@ -82,10 +85,11 @@ void getHttp(char *url)
 
         //printf("parse\n");
         int index = 0;
-        int offset = 0;
 
         u16 type = 0;
         u16 len = 0;
+
+        u16* tempScreenPtr = tempScreen;
 
         while(index < fullSize){
             memcpy(&type, &recvBuff[index + 0], 2);
@@ -95,15 +99,16 @@ void getHttp(char *url)
             //printf("len %d\n", len);
 
             if(type == 1){
-                swiWaitForVBlank();
-                memcpy(VRAM_A + offset, &recvBuff[index + 4], len * 2);
+                memcpy(tempScreenPtr, &recvBuff[index + 4], len * 2);
                 index += len * 2;
             }
 
-            offset += len;
+            tempScreenPtr += len;
             index += 4;
         }
-        //memcpy(VRAM_A, recvBuff, sizeof(recvBuff));
+        
+        swiWaitForVBlank();
+        memcpy(VRAM_A, tempScreen, sizeof(tempScreen));
     }
 
     shutdown(my_socket, 0);
@@ -145,7 +150,7 @@ int main(void)
         int keys = keysDown();
 
         if(keys & KEY_START){
-            getHttp("10.0.0.2");
+            getHttp("10.0.0.76");
         }
     }
     
