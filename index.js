@@ -1,8 +1,6 @@
 import robot from "robotjs";
 import sharp from "sharp";
 import Net from 'net';
-import { deflate, constants } from 'node:zlib';
-import * as fs from 'fs';
 
 const server = new Net.Server();
 const port = 1337;
@@ -24,7 +22,6 @@ server.on('connection', (socket) => {
 });
 
 var lastSend = new Uint16Array(256 * 192);
-//var output2 = new Uint8Array(256 * 192 * 3);
 
 async function SendScreenshot(socket) {
     const im = robot.screen.capture(0, 0, 1280, 720);
@@ -91,15 +88,6 @@ async function SendScreenshot(socket) {
 
     var data_8 = new Uint8Array(output.buffer, output.byteOffset, outputIndex * 2);
 
-    //console.log(output);
-    //console.log(data_8);
-
-    /*
-    deflate(data_8, (err, buffer) => {
-        console.log(buffer.length)
-    }, {options: constants.Z_NO_COMPRESSION});
-    */
-
     //send
 
     if(socket != null){
@@ -110,90 +98,8 @@ async function SendScreenshot(socket) {
         console.log({fullsize});
 
         socket.write(Buffer.concat([buff, data_8]));
-        //socket.write(buff);
-        //socket.write(data_8);
-
+        
         lastSend = imageBuffer;
-        
-        
         return;
     }
-
-    /*
-    var recv_16 = new Uint16Array(data_8.buffer);
-    
-    let fullSize = recv_16.length;
-
-    console.time("fixing");
-    let index = 0;
-    let offset = 0;
-
-    //output2.fill(256 * 192 * 3)
-
-    while(index < fullSize){
-        let type = recv_16[index + 0];
-        let len  = recv_16[index + 1];
-
-        //console.log({index, type, len});
-
-        if(type == 1){
-            //memcpy(VRAM_A + offset, &recvBuff[index + 4], len * 2);
-            
-            let localIndex = 0;
-
-            while((localIndex / 3) < len){
-                var bundle = recv_16[index + localIndex / 3 + 2];
-
-                //console.log({index, offset, bundleIndex});
-
-                output2[offset + localIndex + 0] = ((bundle & 31) << 3);
-                output2[offset + localIndex + 1] = ((bundle & 992) >> 5) << 3;
-                output2[offset + localIndex + 2] = ((bundle & 31744) >> 10) << 3;
-
-                localIndex += 3;
-            }
-
-            index += len;
-        }
-
-        offset += len * 3;
-        index += 2;
-    }
-
-    console.timeEnd("fixing");
-
-    //console.log(recv_16.length);
-    
-    //console.log(output2);
-
-    console.time("save")
-    const image = sharp(output2, {
-        raw: {
-            width: 256,
-            height: 192,
-            channels: 3
-        }
-    });
-
-    await image.toFile("out.png");
-
-    console.timeEnd("save");
-
-    console.timeEnd("total");
-
-    //console.log("done");
-
-    //console.log(data_16);
-    //console.log(data_8);
-
-    */
-    //SendScreenshot(null);
-
-    /*
-    deflate(data_8, (err, buffer) => {
-        console.log(buffer.length)
-    }, {options: constants.Z_NO_COMPRESSION});
-    */
 }
-
-//SendScreenshot(null);

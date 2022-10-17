@@ -83,7 +83,6 @@ void getHttp(char *url)
             break;
         }
 
-        //printf("parse\n");
         int index = 0;
 
         u16 type = 0;
@@ -94,9 +93,6 @@ void getHttp(char *url)
         while(index < fullSize){
             memcpy(&type, &recvBuff[index + 0], 2);
             memcpy(&len, &recvBuff[index + 2], 2);
-
-            //printf("type %d ", type);
-            //printf("len %d\n", len);
 
             if(type == 1){
                 memcpy(tempScreenPtr, &recvBuff[index + 4], len * 2);
@@ -121,18 +117,6 @@ int main(void)
 
     videoSetMode(MODE_FB0);
     vramSetBankA(VRAM_A_LCD);
-    
-    /*
-
-    u16 type = 0;
-
-    char test[] = {(char) 0, (char) 192};
-    //memcpy(VRAM_A + off, test, 2);
-    memcpy(&type, test, 2);
-
-    printf("%d", type);
-
-    */
 
     iprintf("Contacting Wi-Fi... ");
 
@@ -150,8 +134,22 @@ int main(void)
         int keys = keysDown();
 
         if(keys & KEY_START){
+            iprintf("Laptop Connect\n");
             getHttp("10.0.0.76");
         }
+
+        if(keys & KEY_SELECT){
+            iprintf("Main Connect\n");
+            getHttp("10.0.0.2");
+        }
+
+        /*
+        
+            if u wish to use this for some reason,
+            you replace either main connect or laptop connect
+            with your IP
+        
+        */
     }
     
     return 0;
