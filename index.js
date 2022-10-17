@@ -24,7 +24,7 @@ server.on('connection', (socket) => {
 });
 
 var lastSend = new Uint16Array(256 * 192);
-var output2 = new Uint8Array(256 * 192 * 3);
+//var output2 = new Uint8Array(256 * 192 * 3);
 
 async function SendScreenshot(socket) {
     const im = robot.screen.capture(0, 0, 1280, 720);
