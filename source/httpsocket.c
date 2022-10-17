@@ -15,6 +15,10 @@ int recv_all(int socket)
 {
     recv(socket, &fullSize, sizeof(int), 0);
 
+    printf("fullsize %d\n", fullSize);
+
+    if(fullSize < 0) return -1;
+
     char* pointr = recvBuff;
     int count = fullSize;
 
@@ -29,7 +33,6 @@ int recv_all(int socket)
         count -= ret;
         pointr += ret;
     }
-
     return 0;
 }
 
@@ -81,14 +84,18 @@ void getHttp(char *url)
         int index = 0;
         int offset = 0;
 
+        u16 type = 0;
+        u16 len = 0;
+
         while(index < fullSize){
-            u16 type = (uint16_t)(((recvBuff[1 + index] & 0xFF) << 8) | recvBuff[0 + index]);
-            u16 len  = (uint16_t)(((recvBuff[3 + index] & 0xFF) << 8) | recvBuff[2 + index]);
-            
+            memcpy(&type, &recvBuff[index + 0], 2);
+            memcpy(&len, &recvBuff[index + 2], 2);
+
             //printf("type %d ", type);
             //printf("len %d\n", len);
 
             if(type == 1){
+                swiWaitForVBlank();
                 memcpy(VRAM_A + offset, &recvBuff[index + 4], len * 2);
                 index += len * 2;
             }
@@ -109,6 +116,18 @@ int main(void)
 
     videoSetMode(MODE_FB0);
     vramSetBankA(VRAM_A_LCD);
+    
+    /*
+
+    u16 type = 0;
+
+    char test[] = {(char) 0, (char) 192};
+    //memcpy(VRAM_A + off, test, 2);
+    memcpy(&type, test, 2);
+
+    printf("%d", type);
+
+    */
 
     iprintf("Contacting Wi-Fi... ");
 
@@ -126,7 +145,7 @@ int main(void)
         int keys = keysDown();
 
         if(keys & KEY_START){
-            getHttp("10.0.0.76");
+            getHttp("10.0.0.2");
         }
     }
     
